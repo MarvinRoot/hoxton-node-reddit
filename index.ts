@@ -81,6 +81,36 @@ SELECT * FROM posts WHERE id=?`)
 const getCommunityByName = db.prepare(`
 SELECT * FROM communities WHERE name = ?`)
 
+const getPostDownvotesByUserId = db.prepare(`
+SELECT * FROM postDownvotes WHERE userId = ?`)
+
+const getPostUpvotesByUserId = db.prepare(`
+SELECT * FROM postUpvotes WHERE userId = ?`)
+
+const deletePostDownvoteByUserId = db.prepare(`
+    DELETE FROM postDownvotes WHERE userId = ? AND postId = ?
+`)
+
+const deletePostUpVoteByUserId = db.prepare(`
+    DELETE FROM postUpvotes WHERE userId = ? AND postId = ?
+`)
+
+const createPostUpvote = db.prepare(`
+    INSERT INTO postUpvotes  (userId, postId) VALUES (?,?)
+`)
+
+const createPostDownvote = db.prepare(`
+    INSERT INTO postDownvotes  (userId, postId) VALUES (?,?)
+`)
+
+const getPostDownvoteById = db.prepare(`
+    SELECT * FROM postDownvotes WHERE id = ?
+`)
+
+const getPostUpvoteById = db.prepare(`
+    SELECT * FROM postUpvotes WHERE id = ?
+`)
+
 app.get('/users', (req, res) => {
     const users = getAllUsers.all()
     for (const user of users) {
@@ -170,7 +200,7 @@ app.post('/posts', (req, res) => {
     }
 })
 
-app.post('community', (req,res) => {
+app.post('/communities', (req,res) => {
     const { name } = req.body
     
     const checkIfCommunityExists = getCommunityByName.get(name)
@@ -179,6 +209,54 @@ app.post('community', (req,res) => {
         const result = createCommunity.run(name)
         const newCommunity = getCommunityById.get(result.lastInsertRowid)
         res.status(200).send(newCommunity)
+    }
+})
+
+app.post('/postDownvote', (req,res) => {
+    const { userId, postId } = req.body
+    const checkIfUserExists = getUserById.get(userId)
+    const checkIfPostExists = getPostById.get(postId)
+
+    if(checkIfPostExists && checkIfUserExists) {
+        const alreadyDownvoted = getPostDownvotesByUserId.get(userId)
+        const alreadyUpvoted = getPostUpvotesByUserId.get(userId)
+        if(alreadyDownvoted) res.status(400).send({message: 'user already downvoted'})
+        else if(alreadyUpvoted) {
+            const deletePostUpvote = deletePostUpVoteByUserId.run(userId, postId)
+            const result = createPostDownvote.run(userId, postId)
+            const newDownvote = getPostDownvoteById.get(result.lastInsertRowid)
+            res.status(200).send(newDownvote)
+        }else {
+            const result = createPostDownvote.run(userId, postId)
+            const newDownvote = getPostDownvoteById.get(result.lastInsertRowid)
+            res.status(200).send(newDownvote)
+        }
+    } else {
+        res.status(404).send({ error: 'User or post does not exist!' })
+    }
+})
+
+app.post('/postUpvote', (req,res) => {
+    const { userId, postId } = req.body
+    const checkIfUserExists = getUserById.get(userId)
+    const checkIfPostExists = getPostById.get(postId)
+
+    if(checkIfPostExists && checkIfUserExists) {
+        const alreadyDownvoted = getPostDownvotesByUserId.get(userId)
+        const alreadyUpvoted = getPostUpvotesByUserId.get(userId)
+        if(alreadyUpvoted) res.status(400).send({message: 'user already upvoted'})
+        else if(alreadyDownvoted) {
+            const deletePostDownvote = deletePostDownvoteByUserId.run(userId, postId)
+            const result = createPostUpvote.run(userId, postId)
+            const newUpvote = getPostUpvoteById.get(result.lastInsertRowid)
+            res.status(200).send(newUpvote)
+        }else {
+            const result = createPostUpvote.run(userId, postId)
+            const newUpvote = getPostUpvoteById.get(result.lastInsertRowid)
+            res.status(200).send(newUpvote)
+        }
+    } else {
+        res.status(404).send({ error: 'User or post does not exist!' })
     }
 })
 
